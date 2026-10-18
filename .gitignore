@@ -1,0 +1,21 @@
+.build/
+dist/
+.DS_Store
+.swiftpm/
+*.xcodeproj/xcuserdata/
+
+# Private local data and signing material must never enter the repository.
+*.sqlite
+*.sqlite-*
+history*.json
+*.key
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.*
+!.env.example
+.codex/QA.md
+
+# Retained local screenshot drafts; the public gallery uses showcase-*.png.
+/docs/screenshot-*.png

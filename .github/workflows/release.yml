@@ -1,0 +1,53 @@
+name: Prepare release draft
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cliplight-release-draft
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Validate repository
+        run: python3 script/verify_repository.py
+      - name: Build universal preparation artifacts
+        run: ./script/release.sh
+      - name: Verify artifacts
+        run: |
+          (cd dist/release && shasum -a 256 -c SHA256SUMS.txt)
+          hdiutil verify "dist/release/Cliplight-$(tr -d '[:space:]' < VERSION).dmg"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Cliplight-release-preparation
+          path: |
+            dist/release/*.zip
+            dist/release/*.dmg
+            dist/release/SHA256SUMS.txt
+            dist/release/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Create or update the GitHub draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TARGET: ${{ github.sha }}
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          tag="v$version"
+          if state="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            test "$state" = true || { echo "Refusing to modify a published release" >&2; exit 1; }
+            gh release edit "$tag" --notes-file packaging/release-notes.md --title "Cliplight $version"
+            gh release upload "$tag" "dist/release/Cliplight-$version.zip" "dist/release/Cliplight-$version.dmg" dist/release/SHA256SUMS.txt dist/release/BUILD-INFO.txt --clobber
+          else
+            gh release create "$tag" --draft --target "$RELEASE_TARGET" --title "Cliplight $version" --notes-file packaging/release-notes.md "dist/release/Cliplight-$version.zip" "dist/release/Cliplight-$version.dmg" dist/release/SHA256SUMS.txt dist/release/BUILD-INFO.txt
+          fi

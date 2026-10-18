@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-check:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Show toolchain
+        run: swift --version && xcrun --show-sdk-version
+      - name: Validate repository documentation and assets
+        run: python3 script/verify_repository.py
+      - name: Build release configuration
+        run: swift build -c release
+      - name: Run source-level checks
+        run: ./script/check.sh
